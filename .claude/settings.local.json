@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git -c 'user.name=David Medina' -c user.email=dhmedinac@gmail.com commit -q -m 'Initial RAG agent CI/CD scaffold \\(ADK + Vertex RAG + Cloud Run + Cloud Build\\) *)",
+      "Bash(git branch *)"
+    ]
+  }
+}

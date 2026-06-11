@@ -1,0 +1,99 @@
+# Cloud Build pipeline for the RAG agent.
+#
+# One config drives both environments. Each Cloud Build trigger lives in its own
+# GCP project (dev -> rag-agent-dev on branch `dev`, prod -> rag-agent-prod on
+# branch `prod`) and supplies the substitutions below. ${PROJECT_ID} is provided
+# automatically by the trigger. The prod trigger additionally requires manual
+# approval before the build runs (configured on the trigger, see docs/SETUP.md).
+#
+# Steps: build image -> push to Artifact Registry -> sync the Vertex RAG corpus
+# from GCS -> deploy to Cloud Run.
+
+substitutions:
+  _REGION: us-central1
+  _AR_REPO: rag-agent
+  _SERVICE: rag-agent
+  _ENV: dev
+  _CORPUS_DISPLAY_NAME: rag-agent-corpus
+  _GCS_SOURCE: gs://rag-agent-dev-corpus/
+  _RUNTIME_SA: ""                       # leave empty to use the default compute SA
+  _API_KEY_SECRET: rag-agent-api-key
+  _AGENT_MODEL: gemini-2.5-flash
+  _MEMORY: 1Gi
+  _CPU: "1"
+  _MIN_INSTANCES: "0"
+  _MAX_INSTANCES: "4"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: true
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA}
+
+timeout: 1800s
+
+steps:
+  # 1. Build the container image.
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest
+      - .
+
+  # 2. Push all tags to Artifact Registry.
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}
+
+  # 3. Create the corpus if missing and import documents from GCS.
+  #    Reuses the freshly built image so the SDK versions match runtime exactly.
+  - id: corpus-sync
+    name: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA}
+    entrypoint: sh
+    env:
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
+      - GOOGLE_CLOUD_LOCATION=${_REGION}
+      - GOOGLE_GENAI_USE_VERTEXAI=TRUE
+    args:
+      - -c
+      - |
+        set -e
+        python scripts/manage_corpus.py sync \
+          --display-name "${_CORPUS_DISPLAY_NAME}" \
+          --gcs-source "${_GCS_SOURCE}" | tee /workspace/corpus.out
+        grep '^RAG_CORPUS=' /workspace/corpus.out | tail -n1 | cut -d= -f2 \
+          > /workspace/rag_corpus.txt
+        echo "Resolved corpus: $$(cat /workspace/rag_corpus.txt)"
+
+  # 4. Deploy to Cloud Run, wiring in the resolved corpus + API key secret.
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        RAG_CORPUS="$$(cat /workspace/rag_corpus.txt)"
+        SA_FLAG=""
+        if [ -n "${_RUNTIME_SA}" ]; then SA_FLAG="--service-account=${_RUNTIME_SA}"; fi
+        gcloud run deploy ${_SERVICE}-${_ENV} \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA} \
+          --region=${_REGION} \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8080 \
+          --memory=${_MEMORY} \
+          --cpu=${_CPU} \
+          --min-instances=${_MIN_INSTANCES} \
+          --max-instances=${_MAX_INSTANCES} \
+          $$SA_FLAG \
+          --set-secrets=API_KEY=${_API_KEY_SECRET}:latest \
+          --set-env-vars=^@^GOOGLE_CLOUD_PROJECT=${PROJECT_ID}@GOOGLE_CLOUD_LOCATION=${_REGION}@GOOGLE_GENAI_USE_VERTEXAI=TRUE@ENVIRONMENT=${_ENV}@AGENT_MODEL=${_AGENT_MODEL}@RAG_CORPUS=$$RAG_CORPUS@RAG_CORPUS_DISPLAY_NAME=${_CORPUS_DISPLAY_NAME}
