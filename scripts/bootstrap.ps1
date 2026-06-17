@@ -43,36 +43,51 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com `
     secretmanager.googleapis.com storage.googleapis.com
 
 Write-Host "== Artifact Registry repo: $arRepo"
-gcloud artifacts repositories describe $arRepo --location=$region 2>$null
-if (-not $?) {
+$ErrorActionPreference = 'Continue'
+gcloud artifacts repositories describe $arRepo --location=$region 2>$null | Out-Null
+$repoExists = $?
+$ErrorActionPreference = 'Stop'
+if (-not $repoExists) {
     gcloud artifacts repositories create $arRepo --repository-format=docker `
         --location=$region --description="RAG agent images"
 }
 
 Write-Host "== GCS corpus bucket: gs://$bucket"
-gcloud storage buckets describe "gs://$bucket" 2>$null
-if (-not $?) {
+$ErrorActionPreference = 'Continue'
+gcloud storage buckets describe "gs://$bucket" 2>$null | Out-Null
+$bucketExists = $?
+$ErrorActionPreference = 'Stop'
+if (-not $bucketExists) {
     gcloud storage buckets create "gs://$bucket" --location=$region --uniform-bucket-level-access
 }
 
 Write-Host "== Runtime service account: $runtimeSa"
-gcloud iam service-accounts describe $runtimeSa 2>$null
-if (-not $?) { gcloud iam service-accounts create rag-agent-runtime --display-name="RAG agent runtime" }
+$ErrorActionPreference = 'Continue'
+gcloud iam service-accounts describe $runtimeSa 2>$null | Out-Null
+$runtimeSaExists = $?
+$ErrorActionPreference = 'Stop'
+if (-not $runtimeSaExists) { gcloud iam service-accounts create rag-agent-runtime --display-name="RAG agent runtime" }
 foreach ($role in @('roles/aiplatform.user', 'roles/storage.objectViewer', 'roles/secretmanager.secretAccessor')) {
     gcloud projects add-iam-policy-binding $projectId --member="serviceAccount:$runtimeSa" --role=$role --condition=None | Out-Null
 }
 
 Write-Host "== CI service account: $ciSa"
-gcloud iam service-accounts describe $ciSa 2>$null
-if (-not $?) { gcloud iam service-accounts create rag-agent-ci --display-name="RAG agent CI/CD" }
+$ErrorActionPreference = 'Continue'
+gcloud iam service-accounts describe $ciSa 2>$null | Out-Null
+$ciSaExists = $?
+$ErrorActionPreference = 'Stop'
+if (-not $ciSaExists) { gcloud iam service-accounts create rag-agent-ci --display-name="RAG agent CI/CD" }
 foreach ($role in @('roles/run.admin', 'roles/artifactregistry.writer', 'roles/aiplatform.user', 'roles/storage.admin', 'roles/logging.logWriter')) {
     gcloud projects add-iam-policy-binding $projectId --member="serviceAccount:$ciSa" --role=$role --condition=None | Out-Null
 }
 gcloud iam service-accounts add-iam-policy-binding $runtimeSa --member="serviceAccount:$ciSa" --role="roles/iam.serviceAccountUser" | Out-Null
 
 Write-Host "== API key secret: $secret"
-gcloud secrets describe $secret 2>$null
-if (-not $?) {
+$ErrorActionPreference = 'Continue'
+gcloud secrets describe $secret 2>$null | Out-Null
+$secretExists = $?
+$ErrorActionPreference = 'Stop'
+if (-not $secretExists) {
     gcloud secrets create $secret --replication-policy=automatic
     Write-Host "  -> Add a value: 'YOUR_KEY' | gcloud secrets versions add $secret --data-file=- --project=$projectId"
 }
