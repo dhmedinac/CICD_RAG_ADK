@@ -41,7 +41,7 @@ This enables APIs and creates, idempotently:
 ## 3. Add the API key and documents
 
 ```bash
-# Pick a strong key; store it for your API clients.
+# Pick a strong key; store it for your API clients. Project value is the project id in GCP
 printf 'CHANGE_ME_STRONG_KEY' | \
   gcloud secrets versions add rag-agent-api-key --data-file=- --project=rag-agent-dev
 
