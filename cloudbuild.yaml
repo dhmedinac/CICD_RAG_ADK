@@ -17,6 +17,7 @@ substitutions:
   _CORPUS_DISPLAY_NAME: rag-agent-corpus
   _GCS_SOURCE: gs://rag-agent-dev-corpus/
   _RUNTIME_SA: ""                       # leave empty to use the default compute SA
+  _CB_SERVICE_ACCOUNT: ""               # Cloud Build service account (e.g., rag-agent-ci@PROJECT_ID.iam.gserviceaccount.com)
   _API_KEY_SECRET: rag-agent-api-key
   _AGENT_MODEL: gemini-2.5-flash
   _MEMORY: 1Gi
@@ -54,6 +55,24 @@ steps:
       - push
       - --all-tags
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}
+
+  # 2b. Grant Cloud Build service account permission to use the runtime service account.
+  - id: grant-iam-permissions
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        if [ -n "${_RUNTIME_SA}" ]; then
+          gcloud iam service-accounts add-iam-policy-binding "${_RUNTIME_SA}" \
+            --member="serviceAccount:${_CB_SERVICE_ACCOUNT}" \
+            --role=roles/iam.serviceAccountUser \
+            --project=${PROJECT_ID} \
+            --quiet
+          echo "Granted Cloud Build service account permission to use ${_RUNTIME_SA}"
+        else
+          echo "Using default compute service account, skipping IAM grant"
+        fi
 
   # 3. Create the corpus if missing and import documents from GCS.
   #    Reuses the freshly built image so the SDK versions match runtime exactly.
