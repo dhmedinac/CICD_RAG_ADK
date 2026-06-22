@@ -39,7 +39,11 @@ async def api_key_auth(request: Request, call_next):
         return await call_next(request)
 
     if request.headers.get("x-api-key") != settings.api_key:
-        return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key."})
+        return JSONResponse(status_code=401, content={
+            "detail": "Invalid or missing API key.",
+            "received_key": request.headers.get("x-api-key"),
+            "expected_key": settings.api_key,
+        })
 
     return await call_next(request)
 
