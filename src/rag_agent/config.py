@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # --- API auth ---
     # Shared secret expected in the `X-API-Key` request header. Injected on
     # Cloud Run from Secret Manager. When empty, auth is disabled (local dev).
-    api_key: str = "sk-1a2b3c4d5e6f7g8h910j1k2l3m4n5o6p"
+    api_key: str = ""
 
     # --- Vertex AI RAG Engine corpus ---
     # Full resource name takes precedence; otherwise we resolve by display name.
