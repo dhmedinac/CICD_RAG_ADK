@@ -14,13 +14,16 @@ from vertexai.preview import rag
 from .config import settings
 from .prompts import SYSTEM_INSTRUCTION
 
+def _get_rag_resources():
+    return [rag.RagResource(rag_corpus=settings.rag_corpus_resource_name())]
+
 rag_retrieval_tool = VertexAiRagRetrieval(
     name="retrieve_documentation",
     description=(
         "Retrieve the most relevant passages from the private knowledge corpus "
         "to ground an answer. Call this for any factual question."
     ),
-    rag_resources=[rag.RagResource(rag_corpus=settings.rag_corpus_resource_name())],
+    rag_resources=_get_rag_resources(),
     similarity_top_k=settings.similarity_top_k,
     vector_distance_threshold=settings.vector_distance_threshold,
 )

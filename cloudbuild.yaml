@@ -10,7 +10,7 @@
 # from GCS -> deploy to Cloud Run.
 
 substitutions:
-  _REGION: us-central1
+  _REGION: europe-west1
   _AR_REPO: rag-agent
   _SERVICE: rag-agent
   _ENV: dev

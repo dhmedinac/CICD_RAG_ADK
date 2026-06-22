@@ -49,21 +49,27 @@ def find_corpus(display_name: str):
 
 
 def create_corpus(display_name: str):
-    """Create a corpus, tolerating the embedding-config API change."""
-    if hasattr(rag, "RagEmbeddingModelConfig"):
-        # Newer SDK (>= ~1.92): backend_config + RagEmbeddingModelConfig.
-        embedding = rag.RagEmbeddingModelConfig(
-            vertex_prediction_endpoint=rag.VertexPredictionEndpoint(
-                publisher_model=EMBEDDING_MODEL
+    """Create a corpus in Serverless mode."""
+    # Serverless mode is required for new projects in us-central1.
+    # Use display_only_rag_store_config to explicitly enable Serverless.
+    if hasattr(rag, "RagVectorDbConfig"):
+        # Newer SDK with Serverless support.
+        try:
+            return rag.create_corpus(
+                display_name=display_name,
+                display_only_rag_store_config=rag.RagVectorDbConfig(),
             )
-        )
-        return rag.create_corpus(
-            display_name=display_name,
-            backend_config=rag.RagVectorDbConfig(rag_embedding_model_config=embedding),
-        )
-    # Older SDK: embedding_model_config kwarg.
-    embedding = rag.EmbeddingModelConfig(publisher_model=EMBEDDING_MODEL)
-    return rag.create_corpus(display_name=display_name, embedding_model_config=embedding)
+        except TypeError:
+            # Fallback: try without explicit Serverless config.
+            pass
+
+    # Older SDK: use embedding_model_config kwarg.
+    if hasattr(rag, "EmbeddingModelConfig"):
+        embedding = rag.EmbeddingModelConfig(publisher_model=EMBEDDING_MODEL)
+        return rag.create_corpus(display_name=display_name, embedding_model_config=embedding)
+
+    # Last resort: minimal config.
+    return rag.create_corpus(display_name=display_name)
 
 
 def import_files(corpus_name: str, gcs_source: str) -> None:

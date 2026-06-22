@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # --- GCP / Vertex ---
     google_cloud_project: str = ""
-    google_cloud_location: str = "us-central1"
+    google_cloud_location: str = "europe-west1"
     # ADK reads this to route models through Vertex AI instead of the public API.
     google_genai_use_vertexai: str = "TRUE"
 
