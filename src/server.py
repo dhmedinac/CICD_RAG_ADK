@@ -34,6 +34,7 @@ app: FastAPI = get_fast_api_app(
 @app.middleware("http")
 async def api_key_auth(request: Request, call_next):
     """Reject requests without a valid X-API-Key header (when one is configured)."""
+    received_key = request.headers.get("x-api-key")
     if not settings.api_key or request.url.path in _PUBLIC_PATHS:
         return await call_next(request)
 
