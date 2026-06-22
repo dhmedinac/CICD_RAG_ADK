@@ -99,4 +99,5 @@ steps:
           --max-instances=${_MAX_INSTANCES} \
           $$SA_FLAG \
           --set-secrets=API_KEY=${_API_KEY_SECRET}:latest \
+          --update-secrets=* \
           --set-env-vars=^@^GOOGLE_CLOUD_PROJECT=${PROJECT_ID}@GOOGLE_CLOUD_LOCATION=${_REGION}@GOOGLE_GENAI_USE_VERTEXAI=TRUE@ENVIRONMENT=${_ENV}@AGENT_MODEL=${_AGENT_MODEL}@RAG_CORPUS=$$RAG_CORPUS@RAG_CORPUS_DISPLAY_NAME=${_CORPUS_DISPLAY_NAME}
