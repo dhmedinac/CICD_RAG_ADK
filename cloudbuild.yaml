@@ -10,7 +10,8 @@
 # from GCS -> deploy to Cloud Run.
 
 substitutions:
-  _REGION: europe-west1
+  _AR_REGION: us-central1                # Artifact Registry region (must match existing repo)
+  _REGION: europe-west1                  # RAG Engine and Cloud Run region
   _AR_REPO: rag-agent
   _SERVICE: rag-agent
   _ENV: dev
@@ -29,7 +30,7 @@ options:
   dynamicSubstitutions: true
 
 images:
-  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA}
+  - ${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA}
 
 timeout: 1800s
 
@@ -42,9 +43,9 @@ steps:
     args:
       - build
       - -t
-      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA}
+      - ${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA}
       - -t
-      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest
+      - ${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest
       - .
 
   # 2. Push all tags to Artifact Registry.
@@ -53,12 +54,12 @@ steps:
     args:
       - push
       - --all-tags
-      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}
+      - ${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}
 
   # 3. Create the corpus if missing and import documents from GCS.
   #    Reuses the freshly built image so the SDK versions match runtime exactly.
   - id: corpus-sync
-    name: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA}
+    name: ${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA}
     entrypoint: sh
     env:
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
@@ -87,7 +88,7 @@ steps:
         SA_FLAG=""
         if [ -n "${_RUNTIME_SA}" ]; then SA_FLAG="--service-account=${_RUNTIME_SA}"; fi
         gcloud run deploy ${_SERVICE}-${_ENV} \
-          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA} \
+          --image=${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA} \
           --region=${_REGION} \
           --platform=managed \
           --allow-unauthenticated \
