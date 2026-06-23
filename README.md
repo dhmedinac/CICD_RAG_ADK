@@ -47,7 +47,7 @@ uv run uvicorn server:app --app-dir src --reload
 The local server listens on http://localhost:8000. With `API_KEY` set, send it as
 the `X-API-Key` header. `GET /health` is always open.
 
-### Talking to the agent
+### Talking to the agent (local)
 
 ADK exposes session + run endpoints. Quick smoke test (after creating a session):
 
@@ -62,6 +62,68 @@ curl -X POST localhost:8000/run \
   -d '{"app_name":"rag_agent","user_id":"u1","session_id":"s1",
        "new_message":{"role":"user","parts":[{"text":"What does the corpus say about X?"}]}}'
 ```
+
+### Testing on Cloud Run
+
+Test your deployed agent on Cloud Run. First, save the API key in a variable:
+
+**Bash:**
+```bash
+export API_KEY=$(gcloud secrets versions access latest --secret="rag-agent-dev-api-key")
+```
+
+**PowerShell:**
+```powershell
+$API_KEY = gcloud secrets versions access latest --secret="rag-agent-dev-api-key"
+```
+
+Then run the same tests against your Cloud Run endpoint:
+
+**Check health:**
+```bash
+curl https://rag-agent-dev-306628348669.europe-west1.run.app/health
+```
+
+**Create a session:**
+```bash
+curl -X POST https://rag-agent-dev-306628348669.europe-west1.run.app/apps/rag_agent/users/u1/sessions/s1 \
+  -H "X-API-Key: $API_KEY"
+```
+
+**Send a message:**
+```bash
+curl -X POST https://rag-agent-dev-306628348669.europe-west1.run.app/run \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
+  -d '{
+    "app_name": "rag_agent",
+    "user_id": "u1",
+    "session_id": "s1",
+    "new_message": {
+      "role": "user",
+      "parts": [{"text": "What does the corpus say about PLAYERS?"}]
+    }
+  }'
+```
+
+**Stream responses (SSE):**
+```bash
+curl -X POST https://rag-agent-dev-306628348669.europe-west1.run.app/run_sse \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
+  -d '{
+    "app_name": "rag_agent",
+    "user_id": "u1",
+    "session_id": "s1",
+    "new_message": {
+      "role": "user",
+      "parts": [{"text": "What does the corpus say about PLAYERS?"}]
+    }
+  }'
+```
+
+**Interactive API docs:**
+Visit `https://rag-agent-dev-306628348669.europe-west1.run.app/docs` in your browser, click "Authorize", and paste your API key.
 
 ## Deploying
 

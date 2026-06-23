@@ -1,0 +1,12 @@
+﻿{
+    "user_id": "user1",
+    "app_name": "rag_agent",
+    "new_message": {
+        "role": "user",
+        "parts": [
+            {
+                "text": "What does the corpus say about PLAYERS?"
+            }
+        ]
+    }
+}
