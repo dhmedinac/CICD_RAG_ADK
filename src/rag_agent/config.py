@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import functools
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +29,11 @@ class Settings(BaseSettings):
     # Shared secret expected in the `X-API-Key` request header. Injected on
     # Cloud Run from Secret Manager. When empty, auth is disabled (local dev).
     api_key: str = ""
+
+    @field_validator("api_key", mode="before")
+    @classmethod
+    def strip_api_key(cls, v: str) -> str:
+        return v.strip() if v else v
 
     # --- Vertex AI RAG Engine corpus ---
     # Full resource name takes precedence; otherwise we resolve by display name.
