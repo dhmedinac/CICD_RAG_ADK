@@ -69,12 +69,12 @@ Test your deployed agent on Cloud Run. First, save the API key in a variable:
 
 **Bash:**
 ```bash
-export API_KEY=$(gcloud secrets versions access latest --secret="rag-agent-dev-api-key")
+export API_KEY=$(gcloud secrets versions access latest --secret="rag-agent-api-key")
 ```
 
 **PowerShell:**
 ```powershell
-$API_KEY = gcloud secrets versions access latest --secret="rag-agent-dev-api-key"
+$API_KEY = gcloud secrets versions access latest --secret="rag-agent-api-key"
 ```
 
 Then run the same tests against your Cloud Run endpoint:
@@ -87,7 +87,7 @@ curl https://rag-agent-dev-306628348669.europe-west1.run.app/health
 **Create a session:**
 ```bash
 curl -X POST https://rag-agent-dev-306628348669.europe-west1.run.app/apps/rag_agent/users/u1/sessions/s1 \
-  -H "X-API-Key: $API_KEY"
+  -H "X-API-Key: $API_KEY" -H "Content-Length: 0"
 ```
 
 **Send a message:**
