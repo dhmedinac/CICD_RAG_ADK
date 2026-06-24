@@ -87,6 +87,16 @@ steps:
         RAG_CORPUS="$$(cat /workspace/rag_corpus.txt)"
         SA_FLAG=""
         if [ -n "${_RUNTIME_SA}" ]; then SA_FLAG="--service-account=${_RUNTIME_SA}"; fi
+        cat > /tmp/env_vars.yaml <<ENVEOF
+        GOOGLE_CLOUD_PROJECT: ${PROJECT_ID}
+        GOOGLE_CLOUD_LOCATION: ${_REGION}
+        GOOGLE_GENAI_USE_VERTEXAI: "TRUE"
+        ENVIRONMENT: ${_ENV}
+        AGENT_MODEL: ${_AGENT_MODEL}
+        RAG_CORPUS: $$RAG_CORPUS
+        RAG_CORPUS_DISPLAY_NAME: ${_CORPUS_DISPLAY_NAME}
+        VERTEX_AI_SERVICE_ACCOUNT: vertex-ai-caller@${PROJECT_ID}.iam.gserviceaccount.com
+        ENVEOF
         gcloud run deploy ${_SERVICE}-${_ENV} \
           --image=${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${SHORT_SHA} \
           --region=${_REGION} \
@@ -99,4 +109,4 @@ steps:
           --max-instances=${_MAX_INSTANCES} \
           $$SA_FLAG \
           --set-secrets=API_KEY=${_API_KEY_SECRET}:latest \
-          --set-env-vars=^@^GOOGLE_CLOUD_PROJECT=${PROJECT_ID}@GOOGLE_CLOUD_LOCATION=${_REGION}@GOOGLE_GENAI_USE_VERTEXAI=TRUE@ENVIRONMENT=${_ENV}@AGENT_MODEL=${_AGENT_MODEL}@RAG_CORPUS=$$RAG_CORPUS@RAG_CORPUS_DISPLAY_NAME=${_CORPUS_DISPLAY_NAME}@VERTEX_AI_SERVICE_ACCOUNT=vertex-ai-caller@${PROJECT_ID}.iam.gserviceaccount.com
+          --env-vars-file=/tmp/env_vars.yaml
