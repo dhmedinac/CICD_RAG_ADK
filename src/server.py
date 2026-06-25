@@ -34,35 +34,35 @@ app: FastAPI = get_fast_api_app(
 )
 
 
-@app.middleware("http")
-async def verify_service_account(request: Request, call_next):
-    """Verify requests from Vertex AI Agent (via service account) or API key fallback."""
-
-    # Public endpoints don't need auth
-    if request.url.path in _PUBLIC_PATHS:
-        return await call_next(request)
-
-    # Service-to-service endpoints (Vertex AI Agent calls) use service account auth
-    if request.url.path in {"/run", "/run_sse"}:
-        auth_header = request.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-            try:
-                # Verify the token is from our service account
-                claims = id_token.verify_oauth2_token(token, requests.Request())
-                if claims.get("email") == os.getenv("VERTEX_AI_SERVICE_ACCOUNT", ""):
-                    return await call_next(request)
-            except Exception:
-                pass
-            return JSONResponse(status_code=401, content={"detail": "Invalid token"})
-
-    # Other endpoints: require API key (for direct/external access)
-    if settings.api_key:
-        received_key = request.headers.get("x-api-key")
-        if received_key != settings.api_key:
-            return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
-
-    return await call_next(request)
+#app.middleware("http")
+#sync def verify_service_account(request: Request, call_next):
+#   """Verify requests from Vertex AI Agent (via service account) or API key fallback."""
+#
+#   # Public endpoints don't need auth
+#   if request.url.path in _PUBLIC_PATHS:
+#       return await call_next(request)
+#
+#   # Service-to-service endpoints (Vertex AI Agent calls) use service account auth
+#   if request.url.path in {"/run", "/run_sse"}:
+#       auth_header = request.headers.get("authorization", "")
+#       if auth_header.startswith("Bearer "):
+#           token = auth_header.split(" ")[1]
+#           try:
+#               # Verify the token is from our service account
+#               claims = id_token.verify_oauth2_token(token, requests.Request())
+#               if claims.get("email") == os.getenv("VERTEX_AI_SERVICE_ACCOUNT", ""):
+#                   return await call_next(request)
+#           except Exception:
+#               pass
+#           return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+#
+#   # Other endpoints: require API key (for direct/external access)
+#   if settings.api_key:
+#       received_key = request.headers.get("x-api-key")
+#       if received_key != settings.api_key:
+#           return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
+#
+#   return await call_next(request)
 
 
 @app.get("/health")
