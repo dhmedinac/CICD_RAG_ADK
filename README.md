@@ -122,6 +122,22 @@ curl -X POST https://rag-agent-dev-306628348669.europe-west1.run.app/run_sse \
   }'
 ```
 
+Or with different session/user IDs:
+```bash
+curl -X POST https://rag-agent-dev-306628348669.europe-west1.run.app/run_sse \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
+  -d '{
+    "app_name": "rag_agent",
+    "user_id": "u2",
+    "session_id": "s2",
+    "new_message": {
+      "role": "user",
+      "parts": [{"text": "the third.."}]
+    }
+  }'
+```
+
 **Interactive API docs:**
 Visit `https://rag-agent-dev-306628348669.europe-west1.run.app/docs` in your browser, click "Authorize", and paste your API key.
 
