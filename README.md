@@ -47,6 +47,15 @@ uv run uvicorn server:app --app-dir src --reload
 The local server listens on http://localhost:8000. With `API_KEY` set, send it as
 the `X-API-Key` header. `GET /health` is always open.
 
+### Session Storage (Firestore)
+
+Conversations and sessions are persisted in **Cloud Firestore** in your GCP project.
+This ensures data survives Cloud Run restarts and works across multiple replicas.
+
+**Locally:** When developing locally, Firestore access requires GCP authentication.
+Run `gcloud auth application-default login` to authenticate, or set `GOOGLE_CLOUD_PROJECT`
+and `GOOGLE_CLOUD_LOCATION` in your `.env` file.
+
 ### Talking to the agent (local)
 
 ADK exposes session + run endpoints. Quick smoke test (after creating a session):

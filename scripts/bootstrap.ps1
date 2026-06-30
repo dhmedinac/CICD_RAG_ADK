@@ -40,7 +40,8 @@ gcloud config set project $projectId | Out-Null
 Write-Host "== Enabling APIs"
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com `
     artifactregistry.googleapis.com aiplatform.googleapis.com `
-    secretmanager.googleapis.com storage.googleapis.com
+    secretmanager.googleapis.com storage.googleapis.com `
+    firestore.googleapis.com
 
 Write-Host "== Artifact Registry repo: $arRepo"
 $ErrorActionPreference = 'Continue'
@@ -67,7 +68,7 @@ gcloud iam service-accounts describe $runtimeSa 2>$null | Out-Null
 $runtimeSaExists = $?
 $ErrorActionPreference = 'Stop'
 if (-not $runtimeSaExists) { gcloud iam service-accounts create rag-agent-runtime --display-name="RAG agent runtime" }
-foreach ($role in @('roles/aiplatform.user', 'roles/storage.objectViewer', 'roles/secretmanager.secretAccessor')) {
+foreach ($role in @('roles/aiplatform.user', 'roles/storage.objectViewer', 'roles/secretmanager.secretAccessor', 'roles/datastore.user')) {
     gcloud projects add-iam-policy-binding $projectId --member="serviceAccount:$runtimeSa" --role=$role --condition=None | Out-Null
 }
 

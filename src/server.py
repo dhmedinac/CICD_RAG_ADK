@@ -31,6 +31,7 @@ app: FastAPI = get_fast_api_app(
     agents_dir=AGENTS_DIR,
     allow_origins=["*"],
     web=True,
+    session_service_uri="firestore://",
 )
 
 

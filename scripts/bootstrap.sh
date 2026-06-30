@@ -33,7 +33,8 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   aiplatform.googleapis.com \
   secretmanager.googleapis.com \
-  storage.googleapis.com
+  storage.googleapis.com \
+  firestore.googleapis.com
 
 echo "== Artifact Registry repo: ${AR_REPO}"
 gcloud artifacts repositories describe "${AR_REPO}" --location="${REGION}" >/dev/null 2>&1 || \
@@ -48,7 +49,7 @@ gcloud storage buckets describe "gs://${BUCKET}" >/dev/null 2>&1 || \
 echo "== Runtime service account: ${RUNTIME_SA}"
 gcloud iam service-accounts describe "${RUNTIME_SA}" >/dev/null 2>&1 || \
   gcloud iam service-accounts create "${RUNTIME_SA_ID}" --display-name="RAG agent runtime"
-for role in roles/aiplatform.user roles/storage.objectViewer roles/secretmanager.secretAccessor; do
+for role in roles/aiplatform.user roles/storage.objectViewer roles/secretmanager.secretAccessor roles/datastore.user; do
   gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member="serviceAccount:${RUNTIME_SA}" --role="${role}" --condition=None >/dev/null
 done

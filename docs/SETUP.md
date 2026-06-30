@@ -29,10 +29,11 @@ prod trigger then waits for manual approval before deploying.
 
 This enables APIs and creates, idempotently:
 
+- Firestore API (for session persistence)
 - Artifact Registry repo `rag-agent`
 - GCS corpus bucket (from `GCS_SOURCE` in the env file)
 - Runtime SA `rag-agent-runtime@…` — roles: `aiplatform.user`,
-  `storage.objectViewer`, `secretmanager.secretAccessor`
+  `storage.objectViewer`, `secretmanager.secretAccessor`, `datastore.user`
 - CI SA `rag-agent-ci@…` — roles: `run.admin`, `artifactregistry.writer`,
   `aiplatform.user`, `storage.admin`, `logging.logWriter`, plus
   `iam.serviceAccountUser` on the runtime SA
