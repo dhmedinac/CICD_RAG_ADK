@@ -43,6 +43,16 @@ class Settings(BaseSettings):
     similarity_top_k: int = 10
     vector_distance_threshold: float = 0.5
 
+    # --- PostgreSQL Database ---
+    # Connection URL for ADK session persistence.
+    # Format: postgresql+asyncpg://user:password@host:port/database
+    # For Cloud SQL Unix socket: postgresql+asyncpg://user:password@/database?unix_sock_dir=/cloudsql/CONNECTION_NAME
+    database_url: str = ""
+
+    # Cloud SQL connection name (for Cloud SQL Auth Proxy): PROJECT:REGION:INSTANCE
+    # Used when connecting via unix socket in Cloud Run
+    cloud_sql_connection_name: str = ""
+
     def rag_corpus_resource_name(self) -> str:
         """Return the fully-qualified RAG corpus resource name.
 
