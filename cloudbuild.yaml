@@ -92,7 +92,6 @@ steps:
         RAG_CORPUS="$$(cat /workspace/rag_corpus.txt)"
         SA_FLAG=""
         if [ -n "${_RUNTIME_SA}" ]; then SA_FLAG="--service-account=${_RUNTIME_SA}"; fi
-        SQL_CONNECTION_NAME="${PROJECT_ID}:${_REGION}:${_DB_INSTANCE}"
         cat > /tmp/env_vars.yaml <<ENVEOF
         GOOGLE_CLOUD_PROJECT: ${PROJECT_ID}
         GOOGLE_CLOUD_LOCATION: ${_REGION}
@@ -101,7 +100,6 @@ steps:
         AGENT_MODEL: ${_AGENT_MODEL}
         RAG_CORPUS: $$RAG_CORPUS
         RAG_CORPUS_DISPLAY_NAME: ${_CORPUS_DISPLAY_NAME}
-        CLOUD_SQL_CONNECTION_NAME: $$SQL_CONNECTION_NAME
         VERTEX_AI_SERVICE_ACCOUNT: vertex-ai-caller@${PROJECT_ID}.iam.gserviceaccount.com
         ENVEOF
         gcloud run deploy ${_SERVICE}-${_ENV} \
@@ -114,7 +112,6 @@ steps:
           --cpu=${_CPU} \
           --min-instances=${_MIN_INSTANCES} \
           --max-instances=${_MAX_INSTANCES} \
-          --set-cloudsql-instances=$$SQL_CONNECTION_NAME \
           $$SA_FLAG \
           --set-secrets=API_KEY=${_API_KEY_SECRET}:latest,DATABASE_URL=rag-agent-database-url:latest \
           --env-vars-file=/tmp/env_vars.yaml

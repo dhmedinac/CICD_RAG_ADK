@@ -44,14 +44,21 @@ class Settings(BaseSettings):
     vector_distance_threshold: float = 0.5
 
     # --- PostgreSQL Database ---
-    # Connection URL for ADK session persistence.
-    # Format: postgresql+asyncpg://user:password@host:port/database
-    # For Cloud SQL Unix socket: postgresql+asyncpg://user:password@/database?unix_sock_dir=/cloudsql/CONNECTION_NAME
-    database_url: str = ""
+    # Connection URL for ADK session persistence (required).
+    # Local development: postgresql+asyncpg://user:password@localhost:5432/database
+    # Cloud Run with Cloud SQL Connector: postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database
+    database_url: str
 
-    # Cloud SQL connection name (for Cloud SQL Auth Proxy): PROJECT:REGION:INSTANCE
-    # Used when connecting via unix socket in Cloud Run
-    cloud_sql_connection_name: str = ""
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError(
+                "DATABASE_URL is required. Set it in .env or as an environment variable. "
+                "Local: postgresql+asyncpg://user:password@localhost:5432/database. "
+                "Cloud Run: postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database"
+            )
+        return v.strip()
 
     def rag_corpus_resource_name(self) -> str:
         """Return the fully-qualified RAG corpus resource name.

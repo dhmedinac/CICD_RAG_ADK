@@ -78,8 +78,9 @@ echo -n "$DB_PASSWORD" | gcloud secrets create postgres-password \
   --data-file=- \
   --project=$PROJECT_ID
 
-# Create secret for the full connection URL (used for Cloud Run deployment)
-DB_URL="postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@/rag_agent_sessions?unix_sock_dir=/cloudsql/${CONNECTION_NAME}"
+# Create secret for the full connection URL using Cloud SQL Python Connector
+# Format: postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database
+DB_URL="postgresql+asyncpg+cloudsqlconnector://${DB_USER}:${DB_PASSWORD}@${CONNECTION_NAME}/rag_agent_sessions"
 echo -n "$DB_URL" | gcloud secrets create rag-agent-database-url \
   --data-file=- \
   --project=$PROJECT_ID
@@ -151,9 +152,8 @@ GRANT ALL PRIVILEGES ON DATABASE rag_agent_sessions TO rag_agent;
 # Copy example env
 cp .env.example .env
 
-# Edit .env and set (for local development):
+# Edit .env and set (for local development with local PostgreSQL):
 DATABASE_URL=postgresql+asyncpg://rag_agent:your_local_password@localhost:5432/rag_agent_sessions
-CLOUD_SQL_CONNECTION_NAME=  # Leave empty for local dev
 ```
 
 ### Step 4: Install Python Dependencies
@@ -176,6 +176,7 @@ python -c "import asyncio; from rag_agent.config import settings; print(f'Databa
 - `google-cloud-firestore>=2.20.0`
 
 **Added:**
+- `cloud-sql-python-connector>=1.10.0` (Cloud SQL Python Connector for SQLAlchemy + asyncpg)
 - `google-cloud-secret-manager>=2.16.0` (for secret retrieval)
 - `asyncpg>=0.29.0` (PostgreSQL async driver)
 - `sqlalchemy>=2.0.0` (already in file, required for ADK)
@@ -186,17 +187,23 @@ python -c "import asyncio; from rag_agent.config import settings; print(f'Databa
 uv sync
 ```
 
+The Cloud SQL Python Connector automatically handles:
+- GCP authentication via default credentials
+- SSL/TLS certificate management
+- Connection pooling and socket management
+- No need for Cloud SQL Auth Proxy on Cloud Run
+
 ## PHASE 4: CODE CHANGES
 
 The following files have been updated:
 
-1. **`pyproject.toml`** - Added PostgreSQL drivers
-2. **`src/rag_agent/config.py`** - Added `database_url` and `cloud_sql_connection_name` settings
+1. **`pyproject.toml`** - Added `cloud-sql-python-connector` dependency
+2. **`src/rag_agent/config.py`** - Added `database_url` setting with corrected URL format
 3. **`src/server.py`** - Configured ADK to use PostgreSQL for sessions via `session_service_uri`
-4. **`.env.example`** - Added DATABASE_URL and CLOUD_SQL_CONNECTION_NAME variables
-5. **`config/dev.env`** - Added database configuration
-6. **`config/prod.env`** - Added database configuration
-7. **`cloudbuild.yaml`** - Added database-related substitutions and Cloud SQL Auth Proxy setup
+4. **`.env.example`** - Updated DATABASE_URL with correct Cloud SQL Connector format
+5. **`config/dev.env`** - Added database configuration with Cloud SQL Connector format
+6. **`config/prod.env`** - Added database configuration with Cloud SQL Connector format
+7. **`cloudbuild.yaml`** - Removed Cloud SQL Auth Proxy flag (not needed with Cloud SQL Connector)
 
 ### Key Configuration
 
@@ -213,9 +220,11 @@ app = get_fast_api_app(
 
 **Cloud Run Deployment:**
 The `cloudbuild.yaml` now:
-- Passes `--cloudsql-instances=$SQL_CONNECTION_NAME` to enable Cloud SQL Auth Proxy
 - Sets `DATABASE_URL` from Secret Manager as an environment variable
+- Uses the Cloud SQL Python Connector format: `postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database`
+- The Cloud SQL Connector handles authentication via GCP service account credentials
 - The ADK will automatically create session tables on first run
+- No Cloud SQL Auth Proxy needed
 
 ## PHASE 5: DEPLOY AND TEST
 
@@ -293,18 +302,23 @@ Update `pyproject.toml` if you're not using Firestore elsewhere:
 
 ### Connection Issues
 
-**"Can't load plugin: sqlalchemy.dialects:firestore"**
-- ✅ Fixed: Updated `src/server.py` to use PostgreSQL URL instead
+**"connect() got an unexpected keyword argument 'unix_sock_dir'"**
+- ✅ Fixed: Now using Cloud SQL Python Connector instead of invalid parameter
+- Ensure DATABASE_URL uses the correct format: `postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database`
 
 **"Connection refused" when connecting locally**
 - Check PostgreSQL is running: `psql --version`
 - Verify user exists: `psql -U rag_agent`
-- Check DATABASE_URL in `.env` is correct
+- Check DATABASE_URL in `.env` uses localhost: `postgresql+asyncpg://rag_agent:password@localhost:5432/rag_agent_sessions`
 
-**"SSL error" in Cloud Run logs**
-- Cloud SQL Auth Proxy handles SSL automatically
-- Ensure `--cloudsql-instances` flag is set in `cloudbuild.yaml` (it is)
-- Verify IAM role `roles/cloudsql.client` is assigned
+**"Connector error" or "authentication failed" on Cloud Run**
+- Verify the runtime service account has the `roles/cloudsql.client` IAM role
+- Check that DATABASE_URL in Secret Manager uses the correct format with `cloudsqlconnector`
+- View logs: `gcloud run logs read rag-agent-dev --limit=100`
+
+**"Could not translate DSL" errors**
+- Ensure you're using `postgresql+asyncpg+cloudsqlconnector://` scheme (not just `postgresql+asyncpg://`)
+- For local dev, use `postgresql+asyncpg://` with localhost
 
 ### Database Issues
 
@@ -313,7 +327,7 @@ Update `pyproject.toml` if you're not using Firestore elsewhere:
 - Check logs: `gcloud run logs read rag-agent-dev --limit=50`
 
 **Slow queries on sessions**
-- Cloud SQL `db-f1-micro` is shared; upgrade if needed:
+- Cloud SQL instance tier affects performance; upgrade if needed:
   ```bash
   gcloud sql instances patch $INSTANCE_NAME \
     --tier=db-perf-optimized-2 \
@@ -325,12 +339,15 @@ Update `pyproject.toml` if you're not using Firestore elsewhere:
 | Component | Before | After |
 |-----------|--------|-------|
 | Session Backend | Firestore (NoSQL) | PostgreSQL (SQL) |
-| Dependency | `google-cloud-firestore` | `asyncpg` + `sqlalchemy` |
-| Connection | `firestore://` | `postgresql+asyncpg://...` |
-| ADK Config | Broken (no Firestore dialect) | ✅ Native support |
-| Cloud SQL Auth | N/A | Cloud SQL Auth Proxy |
+| Dependency | `google-cloud-firestore` | `cloud-sql-python-connector` + `asyncpg` + `sqlalchemy` |
+| Connection (Local) | `firestore://` | `postgresql+asyncpg://user:password@localhost:5432/database` |
+| Connection (Cloud Run) | N/A | `postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database` |
+| ADK Config | Broken (no Firestore dialect) | ✅ Native PostgreSQL support |
+| Cloud SQL Auth | N/A | Cloud SQL Python Connector (no proxy needed) |
+| Authentication | Service account only | ✅ Service account credentials + connector |
 | Secrets | API_KEY only | API_KEY + DATABASE_URL |
-| Local Dev | Needed Firestore emulator | PostgreSQL only |
+| Local Dev | Needed Firestore emulator | Local PostgreSQL instance |
+| Cloud Run Setup | N/A | Simpler: no Cloud SQL Auth Proxy required |
 
 ## Next Steps
 
