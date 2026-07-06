@@ -46,7 +46,8 @@ class Settings(BaseSettings):
     # --- PostgreSQL Database ---
     # Connection URL for ADK session persistence (required).
     # Local development: postgresql+asyncpg://user:password@localhost:5432/database
-    # Cloud Run with Cloud SQL Connector: postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database
+    # Cloud Run with Cloud SQL Connector: postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database
+    # Note: colons in the connection name must be URL-encoded as %3A
     database_url: str
 
     @field_validator("database_url", mode="before")
@@ -56,7 +57,7 @@ class Settings(BaseSettings):
             raise ValueError(
                 "DATABASE_URL is required. Set it in .env or as an environment variable. "
                 "Local: postgresql+asyncpg://user:password@localhost:5432/database. "
-                "Cloud Run: postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database"
+                "Cloud Run: postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database"
             )
         return v.strip()
 

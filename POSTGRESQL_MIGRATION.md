@@ -79,8 +79,10 @@ echo -n "$DB_PASSWORD" | gcloud secrets create postgres-password \
   --project=$PROJECT_ID
 
 # Create secret for the full connection URL using Cloud SQL Python Connector
-# Format: postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database
-DB_URL="postgresql+asyncpg+cloudsqlconnector://${DB_USER}:${DB_PASSWORD}@${CONNECTION_NAME}/rag_agent_sessions"
+# Format: postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database
+# Note: colons in CONNECTION_NAME must be URL-encoded as %3A
+CONNECTION_NAME_ENCODED="${CONNECTION_NAME//:/\%3A}"  # Replace colons with %3A
+DB_URL="postgresql+asyncpg+cloudsqlconnector://${DB_USER}:${DB_PASSWORD}@${CONNECTION_NAME_ENCODED}/rag_agent_sessions"
 echo -n "$DB_URL" | gcloud secrets create rag-agent-database-url \
   --data-file=- \
   --project=$PROJECT_ID
@@ -316,8 +318,11 @@ Update `pyproject.toml` if you're not using Firestore elsewhere:
 - Check that DATABASE_URL in Secret Manager uses the correct format with `cloudsqlconnector`
 - View logs: `gcloud run logs read rag-agent-dev --limit=100`
 
-**"Could not translate DSL" errors**
+**"Could not translate DSL" or "invalid literal for int()" errors**
 - Ensure you're using `postgresql+asyncpg+cloudsqlconnector://` scheme (not just `postgresql+asyncpg://`)
+- **Critical:** Colons in the connection name MUST be URL-encoded as `%3A`
+  - ✅ Correct: `postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database`
+  - ❌ Wrong: `postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT_ID:REGION:INSTANCE/database`
 - For local dev, use `postgresql+asyncpg://` with localhost
 
 ### Database Issues
@@ -341,7 +346,7 @@ Update `pyproject.toml` if you're not using Firestore elsewhere:
 | Session Backend | Firestore (NoSQL) | PostgreSQL (SQL) |
 | Dependency | `google-cloud-firestore` | `cloud-sql-python-connector` + `asyncpg` + `sqlalchemy` |
 | Connection (Local) | `firestore://` | `postgresql+asyncpg://user:password@localhost:5432/database` |
-| Connection (Cloud Run) | N/A | `postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT:REGION:INSTANCE/database` |
+| Connection (Cloud Run) | N/A | `postgresql+asyncpg+cloudsqlconnector://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database` |
 | ADK Config | Broken (no Firestore dialect) | ✅ Native PostgreSQL support |
 | Cloud SQL Auth | N/A | Cloud SQL Python Connector (no proxy needed) |
 | Authentication | Service account only | ✅ Service account credentials + connector |
