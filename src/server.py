@@ -14,21 +14,15 @@ from __future__ import annotations
 import os
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.sessions import DatabaseSessionService
-from google.auth.transport import requests
-from google.oauth2 import id_token
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from rag_agent.config import settings
 
 # Directory that contains agent app packages (here: src/rag_agent).
 AGENTS_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Endpoints that must remain reachable without an API key.
-_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
 
 
 def _create_session_service() -> DatabaseSessionService:
