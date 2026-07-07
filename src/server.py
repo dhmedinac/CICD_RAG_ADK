@@ -4,7 +4,7 @@ Builds the standard ADK FastAPI app (which exposes /run, /run_sse, session
 endpoints, etc. for the `rag_agent` app) and wraps it with:
   * a /health endpoint for Cloud Run startup/liveness probes, and
   * service account authentication for /agent/* endpoints (Vertex AI),
-  * API-key fallback for direct/external access.
+  * API-key fallback for direct/external access. 
 
 Run locally:  uv run uvicorn server:app --app-dir src --reload
 """
