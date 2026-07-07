@@ -6,7 +6,7 @@ endpoints, etc. for the `rag_agent` app) and wraps it with:
   * service account authentication for /agent/* endpoints (Vertex AI),
   * API-key fallback for direct/external access.
 
-Run locally:  uv run uvicorn server:app --app-dir src --reload
+Run locally:  uv run uvicorn server:app --app-dir src --reload 
 """
 
 from __future__ import annotations
