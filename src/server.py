@@ -11,7 +11,6 @@ Run locally:  uv run uvicorn server:app --app-dir src --reload
 
 from __future__ import annotations
 
-import asyncio
 import os
 from urllib.parse import urlparse
 
@@ -77,6 +76,8 @@ async def _get_session_service() -> DatabaseSessionService:
 # ADK needs this to be available before app creation
 def _create_sync_session_service() -> DatabaseSessionService:
     """Synchronous wrapper to create session service."""
+    from urllib.parse import unquote
+
     db_url = settings.database_url
     parsed = urlparse(db_url)
 
@@ -88,10 +89,25 @@ def _create_sync_session_service() -> DatabaseSessionService:
         from google.cloud.sql.connector import Connector
         from concurrent.futures import ThreadPoolExecutor
 
-        userinfo = parsed.netloc.split("@")[0]
-        connection_name = parsed.netloc.split("@")[1].replace("%3A", ":")
+        # Handle URL-encoded special characters in credentials and connection name
+        if "@" not in parsed.netloc:
+            raise ValueError(
+                f"Invalid Cloud SQL URL format: {db_url}. "
+                "Expected: postgresql+cloudsql://user:password@PROJECT%3AREGION%3AINSTANCE/database. "
+                "Password special characters (/, +, =) must be percent-encoded (%2F, %2B, %3D)"
+            )
+
+        userinfo, connection_part = parsed.netloc.split("@", 1)
+        connection_name = unquote(connection_part.replace("%3A", ":"))
         database = parsed.path.lstrip("/")
-        user, password = (userinfo.split(":", 1) if ":" in userinfo else (userinfo, ""))
+
+        if ":" in userinfo:
+            user, password = userinfo.split(":", 1)
+            user = unquote(user)
+            password = unquote(password)
+        else:
+            user = unquote(userinfo)
+            password = ""
 
         connector = Connector()
         executor = ThreadPoolExecutor(max_workers=5)
