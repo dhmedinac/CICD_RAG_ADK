@@ -5,7 +5,7 @@
 # branch `prod`) and supplies the substitutions below. ${PROJECT_ID} is provided
 # automatically by the trigger. The prod trigger additionally requires manual
 # approval before the build runs (configured on the trigger, see docs/SETUP.md).
-#
+# 
 # Steps: build image -> push to Artifact Registry -> sync the Vertex RAG corpus
 # from GCS -> deploy to Cloud Run.
 
