@@ -19,6 +19,9 @@ from google.adk.cli.fast_api import get_fast_api_app
 from google.auth.transport import requests
 from google.oauth2 import id_token
 
+# Import Cloud SQL Connector to register it as a SQLAlchemy dialect before ADK initializes
+import cloud_sql_python_connector  # noqa: F401
+
 from rag_agent.config import settings
 
 # Directory that contains agent app packages (here: src/rag_agent).
