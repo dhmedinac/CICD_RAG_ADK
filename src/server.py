@@ -12,89 +12,27 @@ Run locally:  uv run uvicorn server:app --app-dir src --reload
 from __future__ import annotations
 
 import os
-from urllib.parse import urlparse
 
 from fastapi import FastAPI
 from google.adk.cli.fast_api import get_fast_api_app
-from google.adk.sessions import DatabaseSessionService
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from rag_agent.config import settings
 
+# Register Cloud SQL Connector dialect before ADK initializes.
+# This import registers the postgresql+cloudsql:// dialect with SQLAlchemy.
+try:
+    from google.cloud.sql.connector import Connector  # noqa: F401
+except ImportError:
+    pass
+
 # Directory that contains agent app packages (here: src/rag_agent).
 AGENTS_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-def _create_session_service() -> DatabaseSessionService:
-    """Create DatabaseSessionService with proper Cloud SQL Connector or local setup."""
-    db_url = settings.database_url
-    parsed = urlparse(db_url)
-
-    # Cloud Run with Cloud SQL Connector
-    if parsed.scheme == "postgresql+cloudsql":
-        import asyncio
-        from concurrent.futures import ThreadPoolExecutor
-
-        from google.cloud.sql.connector import Connector
-
-        # Extract credentials and connection info
-        userinfo = parsed.netloc.split("@")[0]
-        connection_name = parsed.netloc.split("@")[1]
-        database = parsed.path.lstrip("/")
-
-        # Decode URL-encoded colons
-        connection_name = connection_name.replace("%3A", ":")
-
-        # Parse user and password
-        if ":" in userinfo:
-            user, password = userinfo.split(":", 1)
-        else:
-            user = userinfo
-            password = None
-
-        # Create Cloud SQL Connector and async engine
-        connector = Connector()
-        executor = ThreadPoolExecutor(max_workers=5)
-
-        def sync_connect():
-            return connector.connect(
-                connection_name,
-                driver="asyncpg",
-                user=user,
-                password=password,
-                db=database,
-            )
-
-        async def get_async_connection():
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(executor, sync_connect)
-
-        async_engine = create_async_engine(
-            "postgresql+asyncpg://",
-            async_creator=get_async_connection,
-        )
-        return DatabaseSessionService(async_engine)
-
-    # Local development with standard PostgreSQL
-    elif parsed.scheme == "postgresql+asyncpg":
-        async_engine = create_async_engine(db_url)
-        return DatabaseSessionService(async_engine)
-
-    else:
-        raise ValueError(
-            f"Unsupported database URL scheme: {parsed.scheme}. "
-            "Use 'postgresql+asyncpg://' for local or 'postgresql+cloudsql://' for Cloud Run."
-        )
-
-
-# Create session service
-session_service = _create_session_service()
 
 app: FastAPI = get_fast_api_app(
     agents_dir=AGENTS_DIR,
     allow_origins=["*"],
     web=True,
-    session_service=session_service,
+    session_service_uri=settings.database_url,
 )
 
 
