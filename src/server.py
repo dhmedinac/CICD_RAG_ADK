@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 from fastapi import FastAPI
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.sessions import DatabaseSessionService
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 
 from rag_agent.config import settings
 
@@ -26,7 +26,17 @@ from rag_agent.config import settings
 AGENTS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def _create_session_service_for_url(db_url: str) -> DatabaseSessionService:
+class CustomDatabaseSessionService(DatabaseSessionService):
+    """Custom session service that accepts an AsyncEngine directly."""
+
+    def __init__(self, db_engine: AsyncEngine):
+        """Initialize with an AsyncEngine instead of a URL string."""
+        # Skip the parent's __init__ which tries to parse a URL
+        # Instead, set the engine directly
+        self.db_engine = db_engine
+
+
+def _create_session_service_for_url(db_url: str) -> CustomDatabaseSessionService:
     """Create DatabaseSessionService with proper async engine for Cloud SQL or local."""
     from urllib.parse import unquote
     from concurrent.futures import ThreadPoolExecutor
@@ -36,7 +46,7 @@ def _create_session_service_for_url(db_url: str) -> DatabaseSessionService:
     # Local development
     if parsed.scheme == "postgresql+asyncpg":
         engine = create_async_engine(db_url)
-        return DatabaseSessionService(engine)
+        return CustomDatabaseSessionService(engine)
 
     # Cloud Run with Cloud SQL Connector
     if parsed.scheme == "postgresql+cloudsql":
@@ -84,7 +94,7 @@ def _create_session_service_for_url(db_url: str) -> DatabaseSessionService:
             async_creator=get_connection,
             pool_pre_ping=True,
         )
-        return DatabaseSessionService(engine)
+        return CustomDatabaseSessionService(engine)
 
     raise ValueError(f"Unsupported database URL scheme: {parsed.scheme}")
 
