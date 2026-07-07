@@ -11,6 +11,7 @@ Run locally:  uv run uvicorn server:app --app-dir src --reload
 
 from __future__ import annotations
 
+import asyncio
 import os
 from urllib.parse import urlparse
 
