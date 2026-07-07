@@ -26,123 +26,58 @@ from rag_agent.config import settings
 AGENTS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-async def _get_session_service() -> DatabaseSessionService:
-    """Create session service with proper Cloud SQL Connector setup for async."""
-    db_url = settings.database_url
-    parsed = urlparse(db_url)
+def _convert_cloud_sql_url(db_url: str) -> str:
+    """Convert postgresql+cloudsql:// URL to postgresql+asyncpg:// for SQLAlchemy parsing.
 
-    # Local development with standard PostgreSQL
-    if parsed.scheme == "postgresql+asyncpg":
-        engine = create_async_engine(db_url, echo=False)
-        return DatabaseSessionService(engine)
-
-    # Cloud Run with Cloud SQL Connector
-    elif parsed.scheme == "postgresql+cloudsql":
-        from google.cloud.sql.connector import Connector
-
-        # Extract connection info from URL
-        userinfo = parsed.netloc.split("@")[0]
-        connection_name = parsed.netloc.split("@")[1].replace("%3A", ":")
-        database = parsed.path.lstrip("/")
-
-        user, password = (userinfo.split(":", 1) if ":" in userinfo else (userinfo, ""))
-
-        # Create Cloud SQL Connector
-        connector = Connector()
-
-        # Define async creator that uses the connector
-        async def get_connection():
-            return await asyncio.to_thread(
-                lambda: connector.connect(
-                    connection_name,
-                    driver="asyncpg",
-                    user=user,
-                    password=password,
-                    db=database,
-                )
-            )
-
-        # Create async engine using the connector's connection
-        engine = create_async_engine(
-            "postgresql+asyncpg://",
-            async_creator=get_connection,
-        )
-        return DatabaseSessionService(engine)
-
-    else:
-        raise ValueError(f"Unsupported database URL scheme: {parsed.scheme}")
-
-
-# Create session service synchronously at module load time
-# ADK needs this to be available before app creation
-def _create_sync_session_service() -> DatabaseSessionService:
-    """Synchronous wrapper to create session service."""
+    DatabaseSessionService will parse this URL and ADK will create the engine.
+    The Cloud SQL Connector is registered as a dialect and will handle the connection.
+    """
     from urllib.parse import unquote
 
-    db_url = settings.database_url
     parsed = urlparse(db_url)
 
-    if parsed.scheme == "postgresql+asyncpg":
-        engine = create_async_engine(db_url, echo=False)
-        return DatabaseSessionService(engine)
+    if parsed.scheme != "postgresql+cloudsql":
+        return db_url
 
-    elif parsed.scheme == "postgresql+cloudsql":
-        from google.cloud.sql.connector import Connector
-        from concurrent.futures import ThreadPoolExecutor
-
-        # Handle URL-encoded special characters in credentials and connection name
-        if "@" not in parsed.netloc:
-            raise ValueError(
-                f"Invalid Cloud SQL URL format: {db_url}. "
-                "Expected: postgresql+cloudsql://user:password@PROJECT%3AREGION%3AINSTANCE/database. "
-                "Password special characters (/, +, =) must be percent-encoded (%2F, %2B, %3D)"
-            )
-
-        userinfo, connection_part = parsed.netloc.split("@", 1)
-        connection_name = unquote(connection_part.replace("%3A", ":"))
-        database = parsed.path.lstrip("/")
-
-        if ":" in userinfo:
-            user, password = userinfo.split(":", 1)
-            user = unquote(user)
-            password = unquote(password)
-        else:
-            user = unquote(userinfo)
-            password = ""
-
-        connector = Connector()
-        executor = ThreadPoolExecutor(max_workers=5)
-
-        async def get_connection():
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                executor,
-                lambda: connector.connect(
-                    connection_name,
-                    driver="asyncpg",
-                    user=user,
-                    password=password,
-                    db=database,
-                ),
-            )
-
-        engine = create_async_engine(
-            "postgresql+asyncpg://",
-            async_creator=get_connection,
+    # For Cloud SQL, convert to standard asyncpg format that SQLAlchemy can parse
+    # The Cloud SQL Connector's dialect registration will intercept the connection
+    if "@" not in parsed.netloc:
+        raise ValueError(
+            f"Invalid Cloud SQL URL format: {db_url}. "
+            "Expected: postgresql+cloudsql://user:password@PROJECT%3AREGION%3AINSTANCE/database. "
+            "Password special characters (/, +, =) must be percent-encoded (%2F, %2B, %3D)"
         )
-        return DatabaseSessionService(engine)
 
+    userinfo, connection_part = parsed.netloc.split("@", 1)
+    connection_name = unquote(connection_part.replace("%3A", ":"))
+    database = parsed.path.lstrip("/")
+
+    # Return URL in format that Cloud SQL Connector can intercept
+    # Use empty host and connection name in path
+    if ":" in userinfo:
+        user, password = userinfo.split(":", 1)
+        user = unquote(user)
+        password = unquote(password)
+        return f"postgresql+asyncpg://{user}:{password}@/{database}?unix_socket_dir=/cloudsql/{connection_name}"
     else:
-        raise ValueError(f"Unsupported database URL scheme: {parsed.scheme}")
+        user = unquote(userinfo)
+        return f"postgresql+asyncpg://{user}@/{database}?unix_socket_dir=/cloudsql/{connection_name}"
 
 
-session_service = _create_sync_session_service()
+# Register Cloud SQL Connector dialect before creating session service
+try:
+    from google.cloud.sql.connector import Connector  # noqa: F401
+except ImportError:
+    pass
+
+# Convert URL to parseable format for ADK
+_db_url = _convert_cloud_sql_url(settings.database_url)
 
 app: FastAPI = get_fast_api_app(
     agents_dir=AGENTS_DIR,
     allow_origins=["*"],
     web=True,
-    session_service=session_service,
+    session_service_uri=_db_url,
 )
 
 
