@@ -20,7 +20,7 @@ from google.auth.transport import requests
 from google.oauth2 import id_token
 
 # Import Cloud SQL Connector to register it as a SQLAlchemy dialect before ADK initializes
-import cloud_sql_python_connector  # noqa: F401
+from google.cloud.sql.connector import Connector  # noqa: F401
 
 from rag_agent.config import settings
 
