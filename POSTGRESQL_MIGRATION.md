@@ -79,10 +79,10 @@ echo -n "$DB_PASSWORD" | gcloud secrets create postgres-password \
   --project=$PROJECT_ID
 
 # Create secret for the full connection URL using Cloud SQL Python Connector
-# Format: postgresql+asyncpg+cloudsql://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database
+# Format: postgresql+cloudsql://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database
 # Note: colons in CONNECTION_NAME must be URL-encoded as %3A
 CONNECTION_NAME_ENCODED="${CONNECTION_NAME//:/\%3A}"  # Replace colons with %3A
-DB_URL="postgresql+asyncpg+cloudsql://${DB_USER}:${DB_PASSWORD}@${CONNECTION_NAME_ENCODED}/rag_agent_sessions"
+DB_URL="postgresql+cloudsql://${DB_USER}:${DB_PASSWORD}@${CONNECTION_NAME_ENCODED}/rag_agent_sessions"
 echo -n "$DB_URL" | gcloud secrets create rag-agent-database-url \
   --data-file=- \
   --project=$PROJECT_ID
@@ -223,7 +223,7 @@ app = get_fast_api_app(
 **Cloud Run Deployment:**
 The `cloudbuild.yaml` now:
 - Sets `DATABASE_URL` from Secret Manager as an environment variable
-- Uses the Cloud SQL Python Connector format: `postgresql+asyncpg+cloudsql://user:password@PROJECT:REGION:INSTANCE/database`
+- Uses the Cloud SQL Python Connector format: `postgresql+cloudsql://user:password@PROJECT:REGION:INSTANCE/database`
 - The Cloud SQL Connector handles authentication via GCP service account credentials
 - The ADK will automatically create session tables on first run
 - No Cloud SQL Auth Proxy needed
@@ -306,7 +306,7 @@ Update `pyproject.toml` if you're not using Firestore elsewhere:
 
 **"connect() got an unexpected keyword argument 'unix_sock_dir'"**
 - ✅ Fixed: Now using Cloud SQL Python Connector instead of invalid parameter
-- Ensure DATABASE_URL uses the correct format: `postgresql+asyncpg+cloudsql://user:password@PROJECT:REGION:INSTANCE/database`
+- Ensure DATABASE_URL uses the correct format: `postgresql+cloudsql://user:password@PROJECT:REGION:INSTANCE/database`
 
 **"Connection refused" when connecting locally**
 - Check PostgreSQL is running: `psql --version`
@@ -319,10 +319,10 @@ Update `pyproject.toml` if you're not using Firestore elsewhere:
 - View logs: `gcloud run logs read rag-agent-dev --limit=100`
 
 **"Could not translate DSL" or "invalid literal for int()" errors**
-- Ensure you're using `postgresql+asyncpg+cloudsql://` scheme (not just `postgresql+asyncpg://`)
+- Ensure you're using `postgresql+cloudsql://` scheme (not just `postgresql+asyncpg://`)
 - **Critical:** Colons in the connection name MUST be URL-encoded as `%3A`
-  - ✅ Correct: `postgresql+asyncpg+cloudsql://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database`
-  - ❌ Wrong: `postgresql+asyncpg+cloudsql://user:password@PROJECT_ID:REGION:INSTANCE/database`
+  - ✅ Correct: `postgresql+cloudsql://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database`
+  - ❌ Wrong: `postgresql+cloudsql://user:password@PROJECT_ID:REGION:INSTANCE/database`
 - For local dev, use `postgresql+asyncpg://` with localhost
 
 ### Database Issues
@@ -346,7 +346,7 @@ Update `pyproject.toml` if you're not using Firestore elsewhere:
 | Session Backend | Firestore (NoSQL) | PostgreSQL (SQL) |
 | Dependency | `google-cloud-firestore` | `cloud-sql-python-connector` + `asyncpg` + `sqlalchemy` |
 | Connection (Local) | `firestore://` | `postgresql+asyncpg://user:password@localhost:5432/database` |
-| Connection (Cloud Run) | N/A | `postgresql+asyncpg+cloudsql://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database` |
+| Connection (Cloud Run) | N/A | `postgresql+cloudsql://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database` |
 | ADK Config | Broken (no Firestore dialect) | ✅ Native PostgreSQL support |
 | Cloud SQL Auth | N/A | Cloud SQL Python Connector (no proxy needed) |
 | Authentication | Service account only | ✅ Service account credentials + connector |
