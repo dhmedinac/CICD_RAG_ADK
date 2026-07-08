@@ -45,9 +45,10 @@ class Settings(BaseSettings):
 
     # --- PostgreSQL Database ---
     # Connection URL for ADK session persistence (required).
-    # Local development: postgresql+asyncpg://user:password@localhost:5432/database
-    # Cloud Run: postgresql+asyncpg://user:password@localhost:5432/database
-    #   (Cloud SQL Auth Proxy sidecar listens on localhost:5432)
+    # Format: postgresql+asyncpg://user:password@localhost:5432/database
+    # Both local dev and Cloud Run use localhost:5432 because:
+    # - Local: PostgreSQL server listens on localhost
+    # - Cloud Run: Cloud SQL Auth Proxy sidecar proxies connections to localhost:5432
     database_url: str
 
     @field_validator("database_url", mode="before")
@@ -56,8 +57,9 @@ class Settings(BaseSettings):
         if not v or not v.strip():
             raise ValueError(
                 "DATABASE_URL is required. Set it in .env or as an environment variable. "
-                "Local: postgresql+asyncpg://user:password@localhost:5432/database. "
-                "Cloud Run: postgresql+asyncpg+cloudsql://user:password@PROJECT_ID%3AREGION%3AINSTANCE/database"
+                "Format: postgresql+asyncpg://user:password@localhost:5432/database. "
+                "Local dev uses a direct connection to localhost. "
+                "Cloud Run uses a Cloud SQL Auth Proxy sidecar listening on localhost:5432."
             )
         return v.strip()
 

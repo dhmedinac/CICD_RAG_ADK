@@ -1,0 +1,66 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: rag-agent-dev
+  namespace: default
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "4"
+    spec:
+      serviceAccountName: default
+      timeoutSeconds: 300
+      containers:
+      - name: rag-agent
+        image: AGENT_IMAGE_PLACEHOLDER
+        ports:
+        - containerPort: 8080
+        env:
+        - name: GOOGLE_CLOUD_PROJECT
+          value: PROJECT_ID_PLACEHOLDER
+        - name: GOOGLE_CLOUD_LOCATION
+          value: REGION_PLACEHOLDER
+        - name: GOOGLE_GENAI_USE_VERTEXAI
+          value: "TRUE"
+        - name: ENVIRONMENT
+          value: dev
+        - name: AGENT_MODEL
+          value: gemini-2.5-flash
+        - name: RAG_CORPUS
+          value: RAG_CORPUS_PLACEHOLDER
+        - name: RAG_CORPUS_DISPLAY_NAME
+          value: rag-agent-corpus
+        - name: VERTEX_AI_SERVICE_ACCOUNT
+          value: vertex-ai-caller@PROJECT_ID_PLACEHOLDER.iam.gserviceaccount.com
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: rag-agent-api-key
+              key: latest
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: rag-agent-database-url
+              key: latest
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+
+      # Cloud SQL Auth Proxy sidecar - proxies Cloud SQL connections to localhost:5432
+      - name: cloud-sql-proxy
+        image: gcr.io/cloud-sql-docker/cloud-sql-proxy:1.33.2
+        args:
+          - PROJECT_ID_PLACEHOLDER:REGION_PLACEHOLDER:INSTANCE_NAME_PLACEHOLDER
+          - --port=5432
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: 64Mi
+            cpu: 100m
+          limits:
+            memory: 256Mi
+            cpu: 500m
